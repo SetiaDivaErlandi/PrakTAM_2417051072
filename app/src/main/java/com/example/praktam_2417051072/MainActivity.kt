@@ -5,13 +5,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -60,86 +67,122 @@ fun DaftarBeautyScreen() {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(vertical = 16.dp)
     ) {
         Spacer(modifier = Modifier.height(32.dp))
+
+        // SEKSI 1: Rekomendasi Populer (LazyRow)
         Text(
-            text = "Katalog Produk Kecantikan",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 20.dp)
+            text = "Rekomendasi Populer",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
-        
-        BeautySource.dummyBeauty.forEach { item ->
-            BeautyDetailScreen(item = item)
-            Spacer(modifier = Modifier.height(20.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(BeautySource.dummyBeauty.take(3)) { item ->
+                BeautyRekomendasiCard(item = item)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // SEKSI 2: Daftar Menu Lengkap (Vertical)
+        Text(
+            text = "Daftar Produk Lengkap",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            BeautySource.dummyBeauty.forEach { item ->
+                BeautyDetailScreen(item = item)
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun BeautyRekomendasiCard(item: BeautyItem) {
+    Card(
+        modifier = Modifier.width(160.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column {
+            Image(
+                painter = painterResource(id = item.imageRes),
+                contentDescription = item.nama,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                contentScale = ContentScale.Crop
+            )
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    text = item.nama,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1
+                )
+                Text(
+                    text = "Rp ${item.harga}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
 
 @Composable
 fun BeautyDetailScreen(item: BeautyItem) {
-    // Step 3 (LKP 4): Menambahkan State isFavorite
     var isFavorite by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column {
-            // Step 4 (LKP 4): Box agar ikon favorit menumpuk di atas gambar
             Box {
                 Image(
                     painter = painterResource(id = item.imageRes),
                     contentDescription = item.nama,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp),
+                        .height(200.dp),
                     contentScale = ContentScale.Crop
                 )
-                
-                // Step 5 & 6 (LKP 4): IconButton dengan logika toggle klik dan warna
                 IconButton(
                     onClick = { isFavorite = !isFavorite },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
                 ) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "Favorite Icon",
+                        contentDescription = null,
                         tint = if (isFavorite) Color.Red else Color.White
                     )
                 }
             }
-
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = item.nama,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = item.kategori,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
-                )
+                Text(text = item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(text = item.kategori, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Harga: Rp ${item.harga}",
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    fontWeight = FontWeight.SemiBold
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = { },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Tambah Wishlist")
                 }
