@@ -27,18 +27,21 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -48,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import com.example.praktam_2417051072.model.BeautyItem
 import com.example.praktam_2417051072.model.BeautySource
 import com.example.praktam_2417051072.ui.theme.PrakTAM_2417051072Theme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +76,6 @@ fun DaftarBeautyScreen() {
     ) {
         Spacer(modifier = Modifier.height(32.dp))
 
-        // SEKSI 1: Rekomendasi Populer (LazyRow)
         Text(
             text = "Rekomendasi Populer",
             style = MaterialTheme.typography.titleLarge,
@@ -89,7 +93,6 @@ fun DaftarBeautyScreen() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // SEKSI 2: Daftar Menu Lengkap (Vertical)
         Text(
             text = "Daftar Produk Lengkap",
             style = MaterialTheme.typography.titleLarge,
@@ -140,54 +143,88 @@ fun BeautyRekomendasiCard(item: BeautyItem) {
 @Composable
 fun BeautyDetailScreen(item: BeautyItem) {
     var isFavorite by remember { mutableStateOf(false) }
+    
+    // Step 3 (LKP 7): Membuat State dan Scope baru
+    var isLoading by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column {
-            Box {
-                Image(
-                    painter = painterResource(id = item.imageRes),
-                    contentDescription = item.nama,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentScale = ContentScale.Crop
-                )
-                IconButton(
-                    onClick = { isFavorite = !isFavorite },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = null,
-                        tint = if (isFavorite) Color.Red else Color.White
+    // Step 5 (LKP 7): Membungkus Card dengan Box untuk SnackbarHost
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column {
+                Box {
+                    Image(
+                        painter = painterResource(id = item.imageRes),
+                        contentDescription = item.nama,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentScale = ContentScale.Crop
                     )
+                    IconButton(
+                        onClick = { isFavorite = !isFavorite },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (isFavorite) Color.Red else Color.White
+                        )
+                    }
                 }
-            }
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(text = item.kategori, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Harga: Rp ${item.harga}",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = { },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Tambah Wishlist")
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(text = item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(text = item.kategori, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Harga: Rp ${item.harga}",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Step 4 (LKP 7): Logika Loading dan Coroutine pada Button
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                isLoading = true
+                                delay(2000) // Simulasi proses async
+                                snackbarHostState.showSnackbar("Produk ${item.nama} berhasil ditambahkan!")
+                                isLoading = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !isLoading
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Memproses...")
+                        } else {
+                            Text("Tambah Wishlist")
+                        }
+                    }
                 }
             }
         }
+        
+        // Step 5 (LKP 7): SnackbarHost agar pesan muncul di layar
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
