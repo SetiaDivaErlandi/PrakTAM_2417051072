@@ -1,13 +1,31 @@
 package com.example.praktam_2417051072.model
 
-import com.example.praktam_2417051072.R
-
 object BeautySource {
 
     val dummyBeauty = listOf(
-        BeautyItem("Serum Wajah", "Skincare", 120000, R.drawable.skincare),
-        BeautyItem("Lipstick Matte", "Makeup", 85000, R.drawable.makeup),
-        BeautyItem("Hair Spa", "Haircare", 150000, R.drawable.haircare),
-        BeautyItem("Facial Treatment", "Treatment", 250000, R.drawable.treatment)
+        BeautyItem(
+            nama = "Serum Wajah",
+            kategori = "Skincare",
+            harga = 120000,
+            imageUrl = "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=1000&auto=format&fit=crop"
+        ),
+        BeautyItem(
+            nama = "Lipstick Matte",
+            kategori = "Makeup",
+            harga = 85000,
+            imageUrl = "https://images.unsplash.com/photo-1586776977607-310e9c725c37?q=80&w=1000&auto=format&fit=crop"
+        ),
+        BeautyItem(
+            nama = "Hair Spa",
+            kategori = "Haircare",
+            harga = 150000,
+            imageUrl = "https://images.unsplash.com/photo-1522337660859-02fbef99595b?q=80&w=1000&auto=format&fit=crop"
+        ),
+        BeautyItem(
+            nama = "Facial Treatment",
+            kategori = "Treatment",
+            harga = 250000,
+            imageUrl = "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?q=80&w=1000&auto=format&fit=crop"
+        )
     )
 }
