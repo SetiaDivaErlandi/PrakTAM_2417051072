@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,11 +32,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
-import com.example.praktam_2417051072.model.BeautyItem
-import com.example.praktam_2417051072.network.RetrofitClient
+import com.example.praktam_2417051072.data.model.BeautyItem
+import com.example.praktam_2417051072.data.repository.BeautyRepository
 import com.example.praktam_2417051072.ui.theme.PrakTAM_2417051072Theme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.net.UnknownHostException
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,19 +54,29 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp() {
     val navController = rememberNavController()
+    val repository = remember { BeautyRepository() }
+    
     var beautyItems by remember { mutableStateOf<List<BeautyItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var isError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var refreshTrigger by remember { mutableLongStateOf(0L) }
 
-    // Fetch data from API
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshTrigger) {
         try {
-            beautyItems = RetrofitClient.instance.getBeautyItems()
+            isLoading = true
+            errorMessage = null
+            val result = repository.getBeautyItems()
+            beautyItems = result
+            if (result.isEmpty()) {
+                errorMessage = "Belum ada data produk tersedia."
+            }
             isLoading = false
-            isError = false
         } catch (e: Exception) {
             isLoading = false
-            isError = true
+            errorMessage = when (e) {
+                is UnknownHostException -> "Tidak ada koneksi internet. Periksa jaringan Anda."
+                else -> "Gagal memuat data: ${e.localizedMessage}"
+            }
         }
     }
 
@@ -74,7 +86,8 @@ fun MainApp() {
                 navController = navController,
                 items = beautyItems,
                 isLoading = isLoading,
-                isError = isError
+                error = errorMessage,
+                onRefresh = { refreshTrigger = System.currentTimeMillis() }
             )
         }
         composable("detail/{itemName}") { backStackEntry ->
@@ -92,15 +105,27 @@ fun DaftarBeautyScreen(
     navController: NavController,
     items: List<BeautyItem>,
     isLoading: Boolean,
-    isError: Boolean
+    error: String?,
+    onRefresh: () -> Unit
 ) {
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Memuat data...")
+            }
         }
-    } else if (isError) {
+    } else if (error != null) {
         Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "Gagal Memuat Data",
                     style = MaterialTheme.typography.titleLarge,
@@ -109,11 +134,19 @@ fun DaftarBeautyScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Pastikan koneksi internet Anda menyala",
+                    text = error,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onRefresh,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Coba Lagi")
+                }
             }
         }
     } else {
@@ -128,6 +161,7 @@ fun DaftarBeautyScreen(
             Text(
                 text = "Rekomendasi Populer",
                 style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
@@ -147,6 +181,7 @@ fun DaftarBeautyScreen(
             Text(
                 text = "Daftar Produk Lengkap",
                 style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
@@ -167,7 +202,7 @@ fun BeautyRekomendasiCard(item: BeautyItem, onClick: () -> Unit) {
     Card(
         modifier = Modifier.width(160.dp).clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column {
             AsyncImage(
@@ -179,7 +214,7 @@ fun BeautyRekomendasiCard(item: BeautyItem, onClick: () -> Unit) {
                 contentScale = ContentScale.Crop
             )
             Column(modifier = Modifier.padding(8.dp)) {
-                Text(text = item.nama, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                Text(text = item.nama, style = MaterialTheme.typography.titleSmall, maxLines = 1, fontWeight = FontWeight.Bold)
                 Text(
                     text = "Rp ${item.harga}",
                     style = MaterialTheme.typography.bodySmall,
@@ -202,15 +237,18 @@ fun BeautyItemRow(item: BeautyItem, onClick: () -> Unit) {
                 model = item.imageUrl,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                error = painterResource(id = R.drawable.treatment)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(text = item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(text = item.kategori, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 Text(
                     text = "Rp ${item.harga}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -244,7 +282,8 @@ fun BeautyDetailScreen(navController: NavController, item: BeautyItem) {
                     model = item.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxWidth().height(300.dp),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(id = R.drawable.makeup)
                 )
                 IconButton(
                     onClick = { isFavorite = !isFavorite },
@@ -271,7 +310,7 @@ fun BeautyDetailScreen(navController: NavController, item: BeautyItem) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(text = "Deskripsi Produk", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "Produk kecantikan berkualitas tinggi yang membantu menjaga kesehatan dan keindahan kulit Anda secara alami.",
+                    text = "Produk kecantikan berkualitas tinggi dari koleksi kami yang dirancang khusus untuk memenuhi kebutuhan perawatan kulit dan kecantikan Anda setiap hari.",
                     style = MaterialTheme.typography.bodyLarge
                 )
                 
@@ -281,8 +320,8 @@ fun BeautyDetailScreen(navController: NavController, item: BeautyItem) {
                     onClick = {
                         coroutineScope.launch {
                             isProcessing = true
-                            delay(2000)
-                            snackbarHostState.showSnackbar("Produk ${item.nama} ditambahkan ke Wishlist!")
+                            delay(1500)
+                            snackbarHostState.showSnackbar("${item.nama} ditambahkan ke Wishlist!")
                             isProcessing = false
                         }
                     },
@@ -292,10 +331,8 @@ fun BeautyDetailScreen(navController: NavController, item: BeautyItem) {
                 ) {
                     if (isProcessing) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Memproses...")
                     } else {
-                        Text("Tambah Wishlist")
+                        Text("Tambah ke Wishlist")
                     }
                 }
             }
