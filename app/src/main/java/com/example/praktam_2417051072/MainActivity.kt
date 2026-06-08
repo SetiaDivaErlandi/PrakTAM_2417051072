@@ -37,6 +37,7 @@ import com.example.praktam_2417051072.ui.theme.PrakTAM_2417051072Theme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.IOException
+import androidx.compose.material.icons.filled.Favorite
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +55,7 @@ class MainActivity : ComponentActivity() {
 fun MainApp() {
     val navController = rememberNavController()
     val repository = remember { BeautyRepository() }
-    
+
     var beautyItems by remember { mutableStateOf<List<BeautyItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -73,7 +74,6 @@ fun MainApp() {
             isLoading = false
         } catch (e: Exception) {
             isLoading = false
-            // Menampilkan pesan yang lebih ramah pengguna
             errorMessage = if (e is IOException) {
                 "Periksa koneksi internet Anda"
             } else {
@@ -141,8 +141,8 @@ fun DaftarBeautyScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(items.take(3)) { item ->
-                        BeautyRekomendasiCard(item = item, onClick = { 
-                            navController.navigate("detail/${item.nama}") 
+                        BeautyRekomendasiCard(item = item, onClick = {
+                            navController.navigate("detail/${item.nama}")
                         })
                     }
                 }
@@ -157,12 +157,12 @@ fun DaftarBeautyScreen(
 
             items(items) { item ->
                 Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    BeautyItemRow(item = item, onClick = { 
-                        navController.navigate("detail/${item.nama}") 
+                    BeautyItemRow(item = item, onClick = {
+                        navController.navigate("detail/${item.nama}")
                     })
                 }
             }
-            
+
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
@@ -194,29 +194,104 @@ fun BeautyRekomendasiCard(item: BeautyItem, onClick: () -> Unit) {
 
 @Composable
 fun BeautyItemRow(item: BeautyItem, onClick: () -> Unit) {
+    // 1. TAMBAHKAN STATE MANAGEMENT (Modul 5) untuk melacak status favorit tiap item
+    var isFavorite by remember { mutableStateOf(false) }
+
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = item.imageUrl,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop,
-                error = painterResource(id = R.drawable.treatment)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(text = item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(text = item.deskripsi, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1)
-                Text(text = "Rp ${item.harga}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.fillMaxWidth()) {
+
+            // Layout Utama horizontal
+            Row(
+                modifier = Modifier
+                    .padding(12.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Gambar Produk
+                AsyncImage(
+                    model = item.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(id = R.drawable.treatment)
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Kolom informasi teks dan tombol
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = item.nama,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = item.kategori,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = "Rp ${item.harga}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = { onClick() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFE45F14)
+                        ),
+                        contentPadding = PaddingValues(vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = "Pesan Sekarang",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
+            // 2. PERBAIKAN: Mengubah Icon biasa menjadi IconButton agar responsif saat diklik
+            IconButton(
+                onClick = {
+                    // Mengubah status true/false saat ditekan tanpa membuka halaman detail
+                    isFavorite = !isFavorite
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp) // Sedikit disesuaikan agar area klik pas di pojok
+            ) {
+                Icon(
+                    // Logika Modul 5: Jika true pakai ikon Filled (Penuh), jika false pakai Outlined (Garis biasa)
+                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = "Favorit",
+                    // Logika Warna: Jika true warnanya Merah, jika false warnanya Abu-abu
+                    tint = if (isFavorite) Color.Red else Color.Gray,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BeautyDetailScreen(navController: NavController, item: BeautyItem) {
@@ -261,27 +336,56 @@ fun BeautyDetailScreen(navController: NavController, item: BeautyItem) {
             }
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(text = item.nama, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(text = item.deskripsi, style = MaterialTheme.typography.titleMedium, color = Color.Gray)
+                Text(text = item.kategori, style = MaterialTheme.typography.titleMedium, color = Color.Gray)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = "Rp ${item.harga}", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(text = "Deskripsi Lengkap", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(text = "Ini adalah produk berkualitas tinggi untuk perawatan kecantikan Anda.", style = MaterialTheme.typography.bodyLarge)
-                Spacer(modifier = Modifier.height(32.dp))
-                Button(
-                    onClick = {
-                        coroutineScope.launch {
-                            isProcessing = true
-                            delay(1000)
-                            snackbarHostState.showSnackbar("Berhasil dipesan!")
-                            isProcessing = false
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    enabled = !isProcessing
+                Text(text = item.deskripsi, style = MaterialTheme.typography.bodyLarge)
+
+                // Mendorong konten tombol agar menetap rapi di bagian bawah screen
+                Spacer(modifier = Modifier.weight(1f))
+
+                // PERBAIKAN: Struktur Dua Tombol Berdampingan Sesuai Modul 8 & Gambar Acuan
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    if (isProcessing) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    else Text("Pesan Sekarang")
+                    // Tombol Kembali
+                    Button(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Text("Kembali", fontWeight = FontWeight.Bold)
+                    }
+
+                    // Tombol Pesan (dengan integrasi Coroutine & Snackbar Modul 9)
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                isProcessing = true
+                                delay(1000) // Simulasi Asynchronous proses
+                                snackbarHostState.showSnackbar("Berhasil dipesan!")
+                                isProcessing = false
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        enabled = !isProcessing
+                    ) {
+                        if (isProcessing) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            Text("Pesan", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }
