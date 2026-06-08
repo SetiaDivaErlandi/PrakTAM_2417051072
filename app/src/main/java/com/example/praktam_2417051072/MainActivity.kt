@@ -6,11 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
@@ -37,7 +36,7 @@ import com.example.praktam_2417051072.data.repository.BeautyRepository
 import com.example.praktam_2417051072.ui.theme.PrakTAM_2417051072Theme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.net.UnknownHostException
+import java.io.IOException
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,16 +65,19 @@ fun MainApp() {
             isLoading = true
             errorMessage = null
             val result = repository.getBeautyItems()
-            beautyItems = result
             if (result.isEmpty()) {
-                errorMessage = "Belum ada data produk tersedia."
+                errorMessage = "Data tidak ditemukan."
+            } else {
+                beautyItems = result
             }
             isLoading = false
         } catch (e: Exception) {
             isLoading = false
-            errorMessage = when (e) {
-                is UnknownHostException -> "Tidak ada koneksi internet. Periksa jaringan Anda."
-                else -> "Gagal memuat data: ${e.localizedMessage}"
+            // Menampilkan pesan yang lebih ramah pengguna
+            errorMessage = if (e is IOException) {
+                "Periksa koneksi internet Anda"
+            } else {
+                "Gagal memuat data. Silakan coba lagi."
             }
         }
     }
@@ -110,89 +112,58 @@ fun DaftarBeautyScreen(
 ) {
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Memuat data...")
-            }
+            CircularProgressIndicator()
         }
     } else if (error != null) {
         Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = Color.Gray
-                )
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.Gray)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Gagal Memuat Data",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Red
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center
-                )
+                Text("Gagal Memuat Data", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Red)
+                Text(text = error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = onRefresh,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Coba Lagi")
-                }
+                Button(onClick = onRefresh) { Text("Coba Lagi") }
             }
         }
     } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 16.dp)
-        ) {
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            Text(
-                text = "Rekomendasi Populer",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(items.take(3)) { item ->
-                    BeautyRekomendasiCard(item = item, onClick = { 
-                        navController.navigate("detail/${item.nama}") 
-                    })
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            item {
+                Spacer(modifier = Modifier.height(48.dp))
+                Text(
+                    text = "Rekomendasi Populer",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(items.take(3)) { item ->
+                        BeautyRekomendasiCard(item = item, onClick = { 
+                            navController.navigate("detail/${item.nama}") 
+                        })
+                    }
                 }
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Daftar Menu Lengkap",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Daftar Produk Lengkap",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                items.forEach { item ->
+            items(items) { item ->
+                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     BeautyItemRow(item = item, onClick = { 
                         navController.navigate("detail/${item.nama}") 
                     })
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
+            
+            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
 }
@@ -215,11 +186,7 @@ fun BeautyRekomendasiCard(item: BeautyItem, onClick: () -> Unit) {
             )
             Column(modifier = Modifier.padding(8.dp)) {
                 Text(text = item.nama, style = MaterialTheme.typography.titleSmall, maxLines = 1, fontWeight = FontWeight.Bold)
-                Text(
-                    text = "Rp ${item.harga}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Text(text = "Rp ${item.harga}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -243,13 +210,8 @@ fun BeautyItemRow(item: BeautyItem, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(text = item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(text = item.kategori, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                Text(
-                    text = "Rp ${item.harga}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = item.deskripsi, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1)
+                Text(text = "Rp ${item.harga}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -276,7 +238,7 @@ fun BeautyDetailScreen(navController: NavController, item: BeautyItem) {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             Box {
                 AsyncImage(
                     model = item.imageUrl,
@@ -299,41 +261,27 @@ fun BeautyDetailScreen(navController: NavController, item: BeautyItem) {
             }
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(text = item.nama, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(text = item.kategori, style = MaterialTheme.typography.titleMedium, color = Color.Gray)
+                Text(text = item.deskripsi, style = MaterialTheme.typography.titleMedium, color = Color.Gray)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Rp ${item.harga}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = "Rp ${item.harga}", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(24.dp))
-                Text(text = "Deskripsi Produk", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    text = "Produk kecantikan berkualitas tinggi dari koleksi kami yang dirancang khusus untuk memenuhi kebutuhan perawatan kulit dan kecantikan Anda setiap hari.",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                
+                Text(text = "Deskripsi Lengkap", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(text = "Ini adalah produk berkualitas tinggi untuk perawatan kecantikan Anda.", style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(32.dp))
-                
                 Button(
                     onClick = {
                         coroutineScope.launch {
                             isProcessing = true
-                            delay(1500)
-                            snackbarHostState.showSnackbar("${item.nama} ditambahkan ke Wishlist!")
+                            delay(1000)
+                            snackbarHostState.showSnackbar("Berhasil dipesan!")
                             isProcessing = false
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
                     enabled = !isProcessing
                 ) {
-                    if (isProcessing) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                    } else {
-                        Text("Tambah ke Wishlist")
-                    }
+                    if (isProcessing) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    else Text("Pesan Sekarang")
                 }
             }
         }

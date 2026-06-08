@@ -5,7 +5,7 @@ import com.example.praktam_2417051072.data.model.BeautyItem
 
 class BeautyRepository {
     suspend fun getBeautyItems(): List<BeautyItem> {
-        // Mengambil data dari internet (Retrofit)
+        // Langsung panggil tanpa try-catch di sini agar UI bisa menangkap pesan error teknisnya
         return RetrofitClient.instance.getBeautyItems()
     }
 }
