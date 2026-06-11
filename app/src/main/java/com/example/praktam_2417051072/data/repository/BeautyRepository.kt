@@ -5,12 +5,8 @@ import com.example.praktam_2417051072.data.model.BeautyItem
 
 class BeautyRepository {
     // Fungsi ini sekarang murni mengambil data dari Gist JSON melalui Retrofit
+    // Kita biarkan Exception dilempar agar bisa dideteksi oleh UI (isError)
     suspend fun getBeautyItems(): List<BeautyItem> {
-        return try {
-            RetrofitClient.instance.getBeautyItems()
-        } catch (e: Exception) {
-            // Mengembalikan list kosong jika terjadi kesalahan koneksi/API
-            emptyList()
-        }
+        return RetrofitClient.instance.getBeautyItems()
     }
 }

@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
@@ -24,12 +26,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -42,14 +45,9 @@ import com.example.praktam_2417051072.data.repository.BeautyRepository
 import com.example.praktam_2417051072.ui.theme.PrakTAM_2417051072Theme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
-// Model Riwayat Pemesanan
-data class Order(
-    val item: BeautyItem,
-    val orderTime: String
-)
+// Data model untuk mensimulasikan penyimpanan akun pendaftaran
+data class UserAccount(val email: String, val nama: String, val password: String)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,443 +65,404 @@ class MainActivity : ComponentActivity() {
 fun MainApp() {
     val navController = rememberNavController()
     val repository = remember { BeautyRepository() }
-    
-    // State Global
     var beautyItems by remember { mutableStateOf<List<BeautyItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     
-    // State Riwayat Pemesanan (MutableStateList agar reaktif)
-    val orderHistory = remember { mutableStateListOf<Order>() }
+    // State Global (Hoisted)
+    val registeredUsers = remember { mutableStateListOf<UserAccount>() }
+    val orderHistory = remember { mutableStateListOf<BeautyItem>() }
+    val favoriteItems = remember { mutableStateListOf<BeautyItem>() }
+    val scope = rememberCoroutineScope()
 
-    // Memuat data awal dari API Gist
-    LaunchedEffect(Unit) {
-        try {
-            isLoading = true
-            val result = repository.getBeautyItems()
-            beautyItems = result
-            isLoading = false
-        } catch (e: Exception) {
-            isLoading = false
-            errorMessage = "Gagal memuat data produk."
-        }
-    }
-
-    NavHost(navController = navController, startDestination = "login") {
-        composable("login") { LoginScreen(navController) }
-        composable("register") { RegisterScreen(navController) }
-        composable("forgot_password") { ForgotPasswordScreen(navController) }
-        composable("home") {
-            DaftarBeautyScreen(
-                navController = navController,
-                items = beautyItems,
-                isLoading = isLoading,
-                error = errorMessage
-            )
-        }
-        composable("detail/{itemName}") { backStackEntry ->
-            val itemName = backStackEntry.arguments?.getString("itemName")
-            val item = beautyItems.find { it.nama == itemName }
-            item?.let {
-                BeautyDetailScreen(
-                    navController = navController, 
-                    item = it,
-                    onOrderSuccess = { orderedItem ->
-                        val currentTime = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date())
-                        orderHistory.add(Order(orderedItem, currentTime))
-                    }
-                )
-            }
-        }
-        composable("history") {
-            HistoryScreen(navController, orderHistory)
-        }
-    }
-}
-
-// --- 1. SISTEM AUTENTIKASI ---
-
-@Composable
-fun LoginScreen(navController: NavController) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Beauty Store", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Text("Silakan login untuk melanjutkan", color = Color.Gray)
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-            trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                        contentDescription = "Toggle Visibility"
-                    )
-                }
-            },
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-        )
-        
-        TextButton(
-            onClick = { navController.navigate("forgot_password") },
-            modifier = Modifier.align(Alignment.End)
-        ) {
-            Text("Lupa Password?")
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = { navController.navigate("home") },
-            modifier = Modifier.fillMaxWidth().height(50.dp)
-        ) {
-            Text("Login")
-        }
-        
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Belum punya akun?")
-            TextButton(onClick = { navController.navigate("register") }) {
-                Text("Daftar Sekarang")
+    fun refreshData() {
+        scope.launch {
+            try {
+                isLoading = true
+                errorMessage = null
+                delay(2000)
+                val result = repository.getBeautyItems()
+                if (result.isEmpty()) errorMessage = "Data Kosong" else beautyItems = result
+            } catch (e: Exception) {
+                errorMessage = "Gagal Memuat Data."
+            } finally {
+                isLoading = false
             }
         }
     }
-}
 
-@Composable
-fun RegisterScreen(navController: NavController) {
-    var nama by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) { refreshData() }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Daftar Akun Baru", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = nama,
-            onValueChange = { nama = it },
-            label = { Text("Nama Lengkap") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-            visualTransformation = PasswordVisualTransformation()
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-        Button(
-            onClick = { navController.popBackStack() },
-            modifier = Modifier.fillMaxWidth().height(50.dp)
-        ) {
-            Text("Daftar")
+    if (isLoading && beautyItems.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color(0xFFFF51B5))
         }
-        TextButton(onClick = { navController.popBackStack() }) {
-            Text("Sudah punya akun? Login")
+    } else if (errorMessage != null && beautyItems.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Gagal Memuat Data", style = MaterialTheme.typography.titleLarge, color = Color.Red)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = { refreshData() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF51B5))) { Text("Coba Lagi") }
+            }
+        }
+    } else {
+        NavHost(navController = navController, startDestination = "login") {
+            composable("login") { LoginScreen(navController, registeredUsers) }
+            composable("register") { RegisterScreen(navController, registeredUsers) }
+            composable("forgot_password") { ForgotPasswordScreen(navController, registeredUsers) }
+            composable("dashboard/{userEmail}") { backStackEntry ->
+                DashboardScreen(navController, backStackEntry.arguments?.getString("userEmail") ?: "", beautyItems, isLoading, errorMessage, { refreshData() })
+            }
+            composable("profile/{userEmail}") { backStackEntry -> 
+                ProfileScreen(navController, backStackEntry.arguments?.getString("userEmail") ?: "", registeredUsers) 
+            }
+            composable("detail/{itemName}") { backStackEntry ->
+                val item = beautyItems.find { it.nama == backStackEntry.arguments?.getString("itemName") }
+                if (item != null) BeautyDetailScreen(navController, item, orderHistory, favoriteItems)
+            }
+            composable("riwayat") { RiwayatScreen(navController, orderHistory) }
+            composable("favorit") { FavoriteScreen(navController, favoriteItems) }
         }
     }
 }
-
-@Composable
-fun ForgotPasswordScreen(navController: NavController) {
-    var email by remember { mutableStateOf("") }
-    val context = LocalContext.current
-
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Reset Password", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Masukkan email Anda untuk menerima link reset.", textAlign = TextAlign.Center, color = Color.Gray)
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-        Button(
-            onClick = { 
-                Toast.makeText(context, "Link reset password telah dikirim ke email Anda!", Toast.LENGTH_SHORT).show()
-                navController.popBackStack()
-            },
-            modifier = Modifier.fillMaxWidth().height(50.dp)
-        ) {
-            Text("Kirim Link Reset")
-        }
-        TextButton(onClick = { navController.popBackStack() }) {
-            Text("Kembali ke Login")
-        }
-    }
-}
-
-// --- 2. HALAMAN UTAMA & FILTER KATEGORI ---
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DaftarBeautyScreen(
-    navController: NavController,
-    items: List<BeautyItem>,
-    isLoading: Boolean,
-    error: String?
-) {
+fun LoginScreen(navController: NavController, registeredUsers: List<UserAccount>) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
+
+    Scaffold { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp)
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Beauty Store", style = MaterialTheme.typography.headlineLarge, color = Color(0xFFFF51B5), fontWeight = FontWeight.Bold)
+            Text("Silakan login untuk melanjutkan", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            Spacer(modifier = Modifier.height(32.dp))
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                trailingIcon = {
+                    val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(imageVector = image, contentDescription = null)
+                    }
+                },
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+            )
+
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                Text(
+                    "Lupa Password?",
+                    color = Color(0xFFFF51B5),
+                    modifier = Modifier
+                        .clickable { navController.navigate("forgot_password") }
+                        .padding(vertical = 8.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    if (email.isEmpty()) {
+                        Toast.makeText(context, "Email wajib diisi!", Toast.LENGTH_SHORT).show()
+                    } else if (!email.contains("@")) {
+                        Toast.makeText(context, "Format email tidak valid (harus ada @)!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val user = registeredUsers.find { it.email == email && it.password == password }
+                        if (user != null) {
+                            navController.navigate("dashboard/${user.email}") { popUpTo("login") { inclusive = true } }
+                        } else {
+                            Toast.makeText(context, "Email belum terdaftar atau password salah!", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF51B5))
+            ) {
+                Text("Login", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row {
+                Text("Belum punya akun? ")
+                Text(
+                    "Daftar Sekarang",
+                    color = Color(0xFFFF51B5),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { navController.navigate("register") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun RegisterScreen(navController: NavController, registeredUsers: MutableList<UserAccount>) {
+    var nama by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
+
+    Scaffold { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp).verticalScroll(scrollState), 
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Daftar Akun Baru", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(32.dp))
+
+            OutlinedTextField(
+                value = nama, 
+                onValueChange = { nama = it }, 
+                label = { Text("Nama Lengkap") }, 
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = email, 
+                onValueChange = { email = it }, 
+                label = { Text("Email") }, 
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = password, 
+                onValueChange = { password = it }, 
+                label = { Text("Password") }, 
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                visualTransformation = PasswordVisualTransformation(), 
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    if (nama.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                        Toast.makeText(context, "Semua kolom wajib diisi!", Toast.LENGTH_SHORT).show()
+                    } else if (!email.contains("@")) {
+                        Toast.makeText(context, "Format email tidak valid!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        registeredUsers.add(UserAccount(email, nama, password))
+                        Toast.makeText(context, "Pendaftaran Berhasil!", Toast.LENGTH_LONG).show()
+                        navController.popBackStack()
+                    }
+                }, 
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF51B5))
+            ) {
+                Text("Daftar", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                "Sudah punya akun? Login", 
+                color = Color(0xFFFF51B5),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { navController.popBackStack() }
+            )
+        }
+    }
+}
+
+@Composable
+fun ForgotPasswordScreen(navController: NavController, registeredUsers: List<UserAccount>) {
+    var email by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    Scaffold { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp), 
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Reset Password", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(32.dp))
+
+            OutlinedTextField(
+                value = email, 
+                onValueChange = { email = it }, 
+                label = { Text("Email") }, 
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    if (email.isEmpty()) {
+                        Toast.makeText(context, "Masukkan email Anda!", Toast.LENGTH_SHORT).show()
+                    } else if (!email.contains("@")) {
+                        Toast.makeText(context, "Format email tidak valid!", Toast.LENGTH_SHORT).show()
+                    } else if (registeredUsers.any { it.email == email }) { 
+                        Toast.makeText(context, "Link reset dikirim ke email Anda!", Toast.LENGTH_LONG).show()
+                        navController.popBackStack() 
+                    } else {
+                        Toast.makeText(context, "Email tidak terdaftar!", Toast.LENGTH_SHORT).show()
+                    }
+                }, 
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF51B5))
+            ) {
+                Text("Kirim Link Reset", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                "Kembali ke Login", 
+                color = Color(0xFFFF51B5),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { navController.popBackStack() }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DashboardScreen(navController: NavController, userEmail: String, beautyItems: List<BeautyItem>, isLoading: Boolean, errorMessage: String?, onRetry: () -> Unit) {
     var selectedCategory by remember { mutableStateOf("Semua") }
     val categories = listOf("Semua", "Makeup", "Skincare", "Haircare", "Treatment")
-
-    // Filter berdasarkan kategori dari JSON
-    val filteredItems = if (selectedCategory == "Semua") {
-        items
-    } else {
-        items.filter { it.kategori.equals(selectedCategory, ignoreCase = true) }
-    }
+    val filteredItems = if (selectedCategory == "Semua") beautyItems else beautyItems.filter { it.kategori.equals(selectedCategory, ignoreCase = true) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Beauty Store", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = { navController.navigate("history") }) {
-                        Icon(Icons.Default.History, contentDescription = "Riwayat")
-                    }
+                    IconButton(onClick = { navController.navigate("favorit") }) { Icon(Icons.Default.Favorite, null, tint = Color.Red) }
+                    IconButton(onClick = { navController.navigate("riwayat") }) { Icon(Icons.Default.History, null) }
+                    IconButton(onClick = { navController.navigate("profile/$userEmail") }) { Icon(Icons.Default.Person, null) }
                 }
             )
         }
     ) { padding ->
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else if (error != null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(error, color = Color.Red)
-            }
-        } else {
-            LazyColumn(modifier = Modifier.padding(padding).fillMaxSize()) {
-                // Rekomendasi Populer
-                item {
-                    Text(
-                        text = "Rekomendasi Populer",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(items.take(4)) { item ->
-                            BeautyRekomendasiCard(item = item, onClick = {
-                                navController.navigate("detail/${item.nama}")
-                            })
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-
-                // Baris Filter Kategori
-                item {
-                    Text(
-                        text = "Kategori Produk",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(categories) { category ->
-                            FilterChip(
-                                selected = selectedCategory == category,
-                                onClick = { selectedCategory = category },
-                                label = { Text(category) }
-                            )
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
+            item {
+                Text("Rekomendasi Populer", style = MaterialTheme.typography.titleLarge, color = Color(0xFFFF51B5), fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                    items(beautyItems.take(3)) { item ->
+                        Card(modifier = Modifier.width(160.dp).clickable { navController.navigate("detail/${item.nama}") }) {
+                            Column {
+                                AsyncImage(model = item.imageUrl, contentDescription = null, modifier = Modifier.height(100.dp).fillMaxWidth(), contentScale = ContentScale.Crop)
+                                Column(Modifier.padding(8.dp)) {
+                                    Text(item.nama, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                                    Text(item.kategori, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
                         }
                     }
                 }
-
-                item {
-                    Text(
-                        text = "Daftar Menu Lengkap",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
-
-                // List Produk terfilter
-                items(filteredItems) { item ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        BeautyItemRow(item = item, onClick = {
-                            navController.navigate("detail/${item.nama}")
-                        })
+                Text("Kategori Produk", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                    items(categories) { category ->
+                        FilterChip(selected = selectedCategory == category, onClick = { selectedCategory = category }, label = { Text(category) })
                     }
                 }
-                item { Spacer(modifier = Modifier.height(16.dp)) }
+            }
+            items(filteredItems) { item ->
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { navController.navigate("detail/${item.nama}") }) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        AsyncImage(model = item.imageUrl, contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(item.kategori, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Rp ${item.harga}", color = Color(0xFFFF51B5), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
             }
         }
     }
 }
-
-@Composable
-fun BeautyRekomendasiCard(item: BeautyItem, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.width(160.dp).clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column {
-            AsyncImage(
-                model = item.imageUrl,
-                contentDescription = null,
-                modifier = Modifier.fillMaxWidth().height(100.dp),
-                contentScale = ContentScale.Crop
-            )
-            Column(modifier = Modifier.padding(8.dp)) {
-                Text(text = item.nama, style = MaterialTheme.typography.titleSmall, maxLines = 1, fontWeight = FontWeight.Bold)
-                Text(text = "Rp ${item.harga}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            }
-        }
-    }
-}
-
-@Composable
-fun BeautyItemRow(item: BeautyItem, onClick: () -> Unit) {
-    var isFavorite by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = item.imageUrl,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)),
-                contentScale = ContentScale.Crop
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = item.nama, fontWeight = FontWeight.Bold)
-                Text(text = item.kategori, fontSize = 12.sp, color = Color.Gray)
-                Text(text = "Rp ${item.harga}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            }
-            IconButton(onClick = { isFavorite = !isFavorite }) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = null,
-                    tint = if (isFavorite) Color.Red else Color.Gray
-                )
-            }
-        }
-    }
-}
-
-// --- 3. HALAMAN DETAIL ---
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BeautyDetailScreen(
-    navController: NavController, 
-    item: BeautyItem,
-    onOrderSuccess: (BeautyItem) -> Unit
-) {
-    var isProcessing by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
+fun BeautyDetailScreen(navController: NavController, item: BeautyItem, orderHistory: MutableList<BeautyItem>, favoriteItems: MutableList<BeautyItem>) {
+    val isFavorite = favoriteItems.any { it.nama == item.nama }
+    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text("Detail Produk") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                }
-            )
+            TopAppBar(title = { Text("Detail Produk") }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, null) } })
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            AsyncImage(
-                model = item.imageUrl,
-                contentDescription = null,
-                modifier = Modifier.fillMaxWidth().height(250.dp),
-                contentScale = ContentScale.Crop
-            )
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text(text = item.nama, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(text = item.kategori, color = Color.Gray)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Rp ${item.harga}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Deskripsi", fontWeight = FontWeight.Bold)
-                Text(text = item.deskripsi)
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            Box {
+                AsyncImage(model = item.imageUrl, contentDescription = null, modifier = Modifier.fillMaxWidth().height(250.dp).clip(RoundedCornerShape(16.dp)), contentScale = ContentScale.Crop)
+                IconButton(onClick = { if (isFavorite) favoriteItems.removeAll { it.nama == item.nama } else favoriteItems.add(item) }, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                    Icon(imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = null, tint = if (isFavorite) Color.Red else Color.White)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(item.nama, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(item.kategori, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Rp ${item.harga}", style = MaterialTheme.typography.titleLarge, color = Color(0xFFFF51B5), fontWeight = FontWeight.Bold)
+            Text(item.deskripsi, modifier = Modifier.padding(vertical = 16.dp))
+            Button(
+                onClick = { scope.launch { orderHistory.add(item); snackbarHostState.showSnackbar("Berhasil dipesan!") } }, 
+                modifier = Modifier.fillMaxWidth().height(50.dp), 
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF51B5))
+            ) {
+                Text("Pesan Sekarang", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
 
-                Spacer(modifier = Modifier.weight(1f))
-                
-                Button(
-                    onClick = {
-                        coroutineScope.launch {
-                            isProcessing = true
-                            delay(1200) // Simulasi loading
-                            onOrderSuccess(item)
-                            isProcessing = false
-                            snackbarHostState.showSnackbar("Berhasil dipesan!")
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RiwayatScreen(navController: NavController, orderHistory: List<BeautyItem>) {
+    Scaffold(topBar = { TopAppBar(title = { Text("Riwayat") }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, null) } }) }) { padding ->
+        if (orderHistory.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Belum ada pesanan.") }
+        else LazyColumn(Modifier.padding(padding).padding(16.dp)) {
+            items(orderHistory) { item ->
+                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(Modifier.padding(12.dp)) {
+                        AsyncImage(item.imageUrl, null, Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                        Column(Modifier.padding(start = 16.dp)) { 
+                            Text(item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(item.kategori, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text("Rp ${item.harga}", color = Color(0xFFFF51B5))
+                            Text("Pesanan Sukses ✨", color = Color(0xFF2ECC71), style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic))
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    enabled = !isProcessing
-                ) {
-                    if (isProcessing) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                    } else {
-                        Text("Pesan Sekarang")
                     }
                 }
             }
@@ -511,45 +470,53 @@ fun BeautyDetailScreen(
     }
 }
 
-// --- 4. HALAMAN RIWAYAT PEMESANAN ---
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(navController: NavController, orderHistory: List<Order>) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Riwayat Pemesanan") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        if (orderHistory.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Belum ada riwayat pemesanan", color = Color.Gray)
-            }
-        } else {
-            LazyColumn(modifier = Modifier.padding(padding).fillMaxSize()) {
-                items(orderHistory.reversed()) { order ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = order.item.nama, fontWeight = FontWeight.Bold)
-                                Text(text = "Rp ${order.item.harga}", color = MaterialTheme.colorScheme.primary)
-                                Text(text = "Dipesan pada: ${order.orderTime}", fontSize = 12.sp, color = Color.Gray)
-                            }
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50))
+fun FavoriteScreen(navController: NavController, favoriteItems: List<BeautyItem>) {
+    Scaffold(topBar = { TopAppBar(title = { Text("Favorit") }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, null) } }) }) { padding ->
+        if (favoriteItems.isEmpty()) Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Belum ada favorit.") }
+        else LazyColumn(Modifier.padding(padding).padding(16.dp)) {
+            items(favoriteItems) { item ->
+                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { navController.navigate("detail/${item.nama}") }) {
+                    Row(Modifier.padding(12.dp)) {
+                        AsyncImage(item.imageUrl, null, Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                        Column(Modifier.padding(start = 16.dp)) { 
+                            Text(item.nama, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(item.kategori, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text("Rp ${item.harga}", color = Color(0xFFFF51B5))
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileScreen(navController: NavController, userEmail: String, registeredUsers: List<UserAccount>) {
+    val user = registeredUsers.find { it.email == userEmail }
+    Scaffold(topBar = { TopAppBar(title = { Text("Profil") }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, null) } }) }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Card(shape = CircleShape, modifier = Modifier.size(100.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFFAD7A0))) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, Modifier.size(60.dp), tint = Color(0xFFFF51B5)) }
+            }
+            Text(user?.nama ?: "User", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 16.dp), fontWeight = FontWeight.Bold)
+            Text(userEmail, color = Color.Gray)
+            Spacer(Modifier.height(32.dp))
+            Button(
+                onClick = { navController.navigate("riwayat") },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF51B5)) // Tambahkan ini
+            ) {
+                Text("Riwayat Pemesanan", color = Color.White)
+            }
+            OutlinedButton(
+                onClick = { navController.navigate("login") { popUpTo(0) { inclusive = true } } },
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF51B5)) // Mengubah warna teks & border menjadi Pink
+            ) {
+                Text("Logout", fontWeight = FontWeight.Bold)
             }
         }
     }
